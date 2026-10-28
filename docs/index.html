@@ -124,6 +124,24 @@ table.sheet{border-collapse:collapse;font:11px/1 var(--mono);font-variant-numeri
 .key i{width:12px;height:12px;border-radius:3px;background:color-mix(in srgb, var(--fc) 30%, transparent);border:1px solid var(--fc)}
 .example{font:.72rem var(--mono);color:var(--muted)}
 
+.assays{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.acard,.mcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:8px;align-content:start;min-width:0}
+.acard p,.mcard p{font-size:.9rem;color:var(--ink-2)}
+.tagl{justify-self:start;font:600 .7rem var(--mono);letter-spacing:.08em;color:var(--accent);background:var(--accent-soft);padding:4px 8px;border-radius:5px}
+.modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.mvis svg{display:block;width:100%;height:auto}
+.platebox{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+.platewrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;overflow-x:auto}
+.platewrap svg{display:block;width:100%;min-width:480px;height:auto}
+.pinfo{display:grid;gap:12px}
+.pkey{display:grid;gap:6px;font-size:.84rem;color:var(--ink-2)}
+.pkey span{display:flex;align-items:center;gap:8px}
+.pkey i{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid var(--kc);background:color-mix(in srgb,var(--kc) 22%,transparent)}
+.pwell{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:4px;font-size:.88rem;color:var(--ink-2);min-height:96px}
+.pwell b{color:var(--ink);font-family:var(--display)}
+.pwell code{font-size:.78rem}
+#plate .w{cursor:pointer}
+#plate .w:hover circle.ring{stroke-width:3}
 /* code */
 .codegrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .snip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;min-width:0;align-content:start}
@@ -150,12 +168,14 @@ table.var{border-collapse:collapse;width:100%;min-width:640px;font-size:.86rem}
 footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--muted);font-size:.8rem}
 
 @media (max-width:980px){
+  .modes{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .platebox,.assays{grid-template-columns:1fr}
   header.hero .wrap,.retro,.codegrid{grid-template-columns:1fr}
   .machine{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
   .skills{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media (max-width:560px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} .skills{grid-template-columns:1fr} }
+@media (max-width:560px){ .modes{grid-template-columns:1fr} .stats{grid-template-columns:repeat(2,minmax(0,1fr))} .skills{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .backnav{padding-block:18px 0;font:500 .78rem var(--mono)}.backnav a{color:var(--muted);text-decoration:none}.backnav a:hover{color:var(--accent)}
 </style>
@@ -168,7 +188,7 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
     <div>
       <p class="eyebrow">Data automation · case study</p>
       <h1>Screen Grab<span>Turning a folder of lab workbooks into report-ready tables, in one run</span></h1>
-      <p class="lede">In 2023 I worked on a method-validation study for <b>PEPPER</b>, the French public–private platform that pre-validates test methods for endocrine disruptors. Every experiment produced one Excel workbook per run, and the study report needed the same key numbers from each one, laid out the same way. Instead of copying cells and taking screenshots by hand, I wrote a Python script that opens every workbook in a folder, reads the right cells and exports one clean PNG table per chemical.</p>
+      <p class="lede">In 2023 I worked on a validation study of two reporter-gene assays used to detect endocrine disruptors. Every experiment produced one Excel workbook per run, and the study report needed the same key numbers from each one, laid out the same way. Instead of copying cells and taking screenshots by hand, I wrote a Python script that opens every workbook in a folder, reads the right cells and exports one clean PNG table per chemical.</p>
       <div class="tags"><span class="tag">Python 3</span><span class="tag">pandas</span><span class="tag">pathlib</span><span class="tag">Bokeh DataTable</span><span class="tag">export_png</span><span class="tag">batch processing</span><span class="tag">2023</span></div>
     </div>
     <div class="flow" id="flow"></div>
@@ -185,6 +205,41 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
       <div class="stat"><b>7 × 4</b><small>concentrations × replicate wells, per chemical and per sheet</small></div>
       <div class="stat"><b>3</b><small>tables combined in each exported image</small></div>
       <div class="stat"><b>1</b><small>command to process a whole folder</small></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-assay">
+  <div class="wrap">
+    <p class="eyebrow">The biology in brief</p>
+    <h2 id="h-assay">Two receptors, three questions</h2>
+    <p class="lede read">Both assays use human cells that make light (luciferase) when a hormone receptor is switched on. A transactivation assay (TA) measures that light after 16 to 24 hours of exposure to a chemical.</p>
+    <div class="assays">
+      <article class="acard"><span class="tagl">GRTA</span><h3>Glucocorticoid receptor</h3><p>The receptor for cortisol, the stress hormone. It controls inflammation, sugar metabolism and the response to stress. Reference agonist: a synthetic glucocorticoid such as dexamethasone.</p></article>
+      <article class="acard"><span class="tagl">RARTA</span><h3>Retinoic acid receptor</h3><p>The receptor for retinoic acid, made from vitamin A. It guides embryo development and cell differentiation. Reference agonist: a synthetic retinoid such as TTNPB.</p></article>
+    </div>
+    <div class="modes">
+      <article class="mcard"><div class="mvis" data-m="AGO"></div><h3>AGO · agonist</h3><p>The chemical alone, at 7 doses. Light is expressed as a percentage of the reference agonist’s maximum. <b>Basal</b> is the light of untreated wells; the <b>induction factor</b> is how many times brighter the reference makes the cells.</p></article>
+      <article class="mcard"><div class="mvis" data-m="ANT"></div><h3>ANT · antagonist</h3><p>The chemical plus the reference agonist at the dose giving about 80 % of its maximum (<b>Ref80</b>). If the chemical blocks the receptor, the light falls below that 80 % line.</p></article>
+      <article class="mcard"><div class="mvis" data-m="INT"></div><h3>INT · interference</h3><p>The same co-exposure with the reference at full strength. A true competitor loses ground against a full dose; a chemical that harms the cells or the light reaction keeps lowering the signal.</p></article>
+      <article class="mcard"><div class="mvis" data-m="VIA"></div><h3>Viability</h3><p>For every dose the workbook also holds a viability reading. A drop in light only counts if the cells are still alive at that dose.</p></article>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-plate">
+  <div class="wrap">
+    <p class="eyebrow">Inside one run</p>
+    <h2 id="h-plate">One 96-well plate, two chemicals</h2>
+    <p class="lede read">Each run tests two chemicals on the same plate: the top one in rows A–D, the bottom one in rows E–H, each at 7 concentrations in 4 replicate wells. These 28 wells are exactly the 7 × 4 block the script cuts out of the workbook. Hover a well to see what it contains.</p>
+    <div class="controls"><div class="ctl">Mode <span class="seg" id="segPlate"><button type="button" data-v="AGO" aria-pressed="true">AGO</button><button type="button" data-v="ANT" aria-pressed="false">ANT</button><button type="button" data-v="INT" aria-pressed="false">INT</button></span></div></div>
+    <div class="platebox">
+      <div class="platewrap"><svg id="plate" viewBox="0 0 640 420" role="img" aria-label="96-well plate layout"></svg></div>
+      <div class="pinfo">
+        <div class="pkey" id="pkey"></div>
+        <div class="pwell" id="pwell"><b>Hover a well</b><span>Its content and where its value lands in the workbook appear here.</span></div>
+        <p class="example">Illustrative layout built from the script’s 7 × 4 data blocks and its control cells; example light values.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -228,7 +283,7 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
     <h2 id="h-code">Four ideas do all the work</h2>
     <div class="codegrid">
       <div class="snip"><h3>Loop over a whole folder</h3><p><code>pathlib</code> finds every workbook, so a new batch of runs only needs to be dropped in the folder.</p>
-<pre>mydir = Path('.../GRTA/Data_Inserm/PHASE_2/ago')
+<pre>mydir = Path('.../GRTA/PHASE_2/ago')
 <span class="h">for file in mydir.glob('*.xlsx'):</span>
     df = pd.read_excel(file, sheet_name='Luminescence')</pre></div>
       <div class="snip"><h3>Read single cells by position</h3><p>The run template never changes, so each field sits at a fixed address. <code>iat[row, col]</code> picks it directly.</p>
@@ -258,8 +313,8 @@ export_png(grid, filename='_'.join(names) + '.png')
       <thead><tr><th>Mode</th><th>Question asked</th><th>Extra fields read</th><th>Columns in the identity table</th></tr></thead>
       <tbody>
         <tr><td>AGO · agonist</td><td>Does the chemical activate the receptor on its own?</td><td>none</td><td><span class="pill">Date</span><span class="pill">Molecule</span><span class="pill">Mode</span><span class="pill">Run</span><span class="pill">Basal</span><span class="pill">Induction factor</span></td></tr>
-        <tr><td>ANT · antagonist</td><td>Does it block the receptor activated by a reference agonist?</td><td><span class="pill on">Ref80 mean / sd (E21:F21)</span><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Ref80 (%mean)</span><span class="pill on">Ref80 (%sd)</span><span class="pill on">Conc coexpo (M)</span></td></tr>
-        <tr><td>INT · interference</td><td>Does it disturb the reporter signal itself?</td><td><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Conc coexpo (M)</span></td></tr>
+        <tr><td>ANT · antagonist</td><td>Does it block the receptor when the reference agonist is present at 80 %?</td><td><span class="pill on">Ref80 mean / sd (E21:F21)</span><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Ref80 (%mean)</span><span class="pill on">Ref80 (%sd)</span><span class="pill on">Conc coexpo (M)</span></td></tr>
+        <tr><td>INT · interference</td><td>Is a drop real competition, or is the chemical disturbing the cells or the light reaction?</td><td><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Conc coexpo (M)</span></td></tr>
       </tbody>
     </table></div>
     <p class="lede read" style="font-size:.92rem">The <b>GRTA</b> scripts (glucocorticoid receptor transactivation, phase 2) read <code>.xlsx</code> files; the <b>RARTA</b> scripts (retinoic acid receptor transactivation, phase 1) read macro-enabled <code>.xlsm</code> workbooks. Everything else is shared.</p>
@@ -311,7 +366,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const FIELDS = {
   id:  {label:'Run identity (date, chemical, mode, run)', color:'--f-id'},
   ctl: {label:'Plate controls (basal, induction factor, Ref80)', color:'--f-ctl'},
-  co:  {label:'Co-exposure concentration', color:'--f-co'},
+  co:  {label:'Co-exposure concentration of the reference agonist', color:'--f-co'},
   lum: {label:'Luminescence block', color:'--f-lum'},
   via: {label:'Viability block', color:'--f-via'},
 };
@@ -374,7 +429,7 @@ const SH = v => { const e = Math.floor(Math.log10(v)); const m = v / 10**e; retu
 /* ---------- state ---------- */
 const st = { assay: 'GRTA', mode: 'AGO', half: 'top', sheet: 'Luminescence', file: 0, folder: [], exported: [] };
 function load(){ st.folder = makeFolder(st.assay, st.mode); st.file = Math.min(st.file, st.folder.length - 1); st.exported = []; renderFolder(); renderOutputs(); render(); }
-const folderPath = () => `…/PEPPER/${st.assay === 'GRTA' ? 'GRTA/Data_Inserm/PHASE_2' : 'RAR/Manip_Inserm/PHASE_1'}/${({AGO:'ago',ANT:'antago',INT:'interf'})[st.mode]}`;
+const folderPath = () => `…/${st.assay === 'GRTA' ? 'GRTA/PHASE_2' : 'RARTA/PHASE_1'}/${({AGO:'ago',ANT:'antago',INT:'interf'})[st.mode]}`;
 
 function renderFolder(){
   $('#path').textContent = folderPath();
@@ -391,7 +446,7 @@ function sheetCells(f){
   const c = {}; const put = (addr, v, cls, fld) => c[addr] = { v, cls, fld };
   const lum = st.sheet === 'Luminescence';
   if (lum){
-    put('B2','PEPPER · run template','lbl'); put('D4','Date','lbl'); put('E4', f.date, '', 'id');
+    put('B2','Run template','lbl'); put('D4','Date','lbl'); put('E4', f.date, '', 'id');
     put('D11','Co-exposure (M)','lbl'); if (f.coexp) put('E11', SH(f.coexp), '', 'co'); else put('E11','—','raw');
     put('D14','Chemical','lbl'); put('G14','Mode','lbl'); put('H14','Run','lbl');
     put('C15','Top','lbl'); put('E15', f.top, '', st.half==='top'?'id':null); put('G15', f.mode, '', 'id'); put('H15', f.runTop, '', st.half==='top'?'id':null);
@@ -487,6 +542,65 @@ $('#run').addEventListener('click', async () => {
   }
   btn.disabled = false; btn.textContent = `Done · ${st.exported.filter(e => !e.skip).length} images · run again`;
 });
+
+/* ---------- biology mini visuals ---------- */
+function modeVis(m){
+  const dot = (x,y) => `<circle cx="${x}" cy="${y}" r="5" style="fill:var(--f-ctl)"/>`;
+  const dia = (x,y) => `<rect x="${x-4}" y="${y-4}" width="8" height="8" transform="rotate(45 ${x} ${y})" style="fill:var(--f-id)"/>`;
+  const glow = {AGO:.9, ANT:.45, INT:.6, VIA:.7}[m];
+  let s = `<svg viewBox="0 0 200 90" aria-hidden="true"><rect x="2" y="2" width="196" height="86" rx="12" style="fill:var(--sunk)"/>`;
+  s += `<circle cx="150" cy="45" r="${14+16*glow}" style="fill:var(--glow);opacity:${.15+.35*glow}"/><circle cx="150" cy="45" r="${5+6*glow}" style="fill:var(--glow)"/>`;
+  if (m !== 'VIA') { s += dot(24,30) + dot(40,48) + dot(28,64); }
+  if (m === 'ANT') s += dia(70,34) + dia(78,56);
+  if (m === 'INT') s += dia(64,28) + dia(80,40) + dia(66,58) + dia(84,66);
+  if (m === 'VIA') { for (let i=0;i<6;i++) s += `<ellipse cx="${26+(i%3)*24}" cy="${32+Math.floor(i/3)*26}" rx="10" ry="7" style="fill:${i===5?'none':'var(--f-lum)'};opacity:${i===5?1:.6};stroke:var(--f-lum);${i===5?'stroke-dasharray:3 2':''}"/>`; }
+  return s + '</svg>';
+}
+document.querySelectorAll('.mvis').forEach(el => el.innerHTML = modeVis(el.dataset.m));
+
+/* ---------- 96-well plate ---------- */
+const pst = { mode: 'AGO' };
+const PB = { top: makeBlock(rng(11), 'AGO', 0), bot: makeBlock(rng(12), 'AGO', 3) };
+const PBm = m => ({ top: makeBlock(rng(11), m, 0), bot: makeBlock(rng(12), m, 3) });
+function wellInfo(r, c){ // r 0..7, c 0..11
+  const half = r < 4 ? 'top' : 'bot', rep = r % 4, row = 'ABCDEFGH'[r];
+  if (c === 0) return { kind:'ctl', title:`${row}1 · solvent control`, text:'Cells with the solvent only (0.1 % DMSO): the background light.', cell:'Basal (% mean, % sd) → E19:F19' };
+  if (c >= 1 && c <= 7){ const k = c - 1, hdr = half === 'top' ? 30 : 42, R = hdr + 1 + k;
+    const extra = pst.mode === 'ANT' ? ' plus the reference agonist at 80 %' : pst.mode === 'INT' ? ' plus the reference agonist at 100 %' : '';
+    return { kind:'chem', half, k, rep, title:`${row}${c+1} · ${half === 'top' ? 'top' : 'bottom'} chemical, dose ${k+1} of 7`, text:`Replicate ${rep+1} of 4${extra}.`, cell:`Luminescence row ${R}, column ${'LMNO'[rep]} (norm${rep+1})` }; }
+  if (c === 8 || c === 9) return { kind:'ref', title:`${row}${c+1} · reference agonist, full dose`, text:'Defines 100 % for normalisation.', cell:'Induction factor (mean, sd) → E20:F20' };
+  if (c === 10) return pst.mode === 'ANT' ? { kind:'ref80', title:`${row}11 · reference agonist at 80 %`, text:'The level an antagonist has to push down.', cell:'Ref80 (% mean, % sd) → E21:F21' }
+                                          : { kind:'empty', title:`${row}11 · not used in ${pst.mode} runs`, text:'Kept free in this layout.', cell:'not read' };
+  return { kind:'empty', title:`${row}12 · medium only`, text:'Edge wells evaporate faster, so they hold no test.', cell:'not read' };
+}
+function drawPlate(){
+  const svg = $('#plate'), data = PBm(pst.mode);
+  const x0 = 56, y0 = 64, step = 44, rad = 17;
+  const col = { ctl:'var(--f-ctl)', ref:'var(--f-ctl)', ref80:'var(--f-ctl)', chem:'var(--f-lum)', empty:'var(--line)' };
+  let s = `<rect x="6" y="6" width="628" height="408" rx="22" style="fill:var(--sunk);stroke:var(--line)"/>`;
+  for (let c=0;c<12;c++) s += `<text x="${x0+c*step}" y="32" text-anchor="middle" style="font:11px var(--mono);fill:var(--muted)">${c+1}</text>`;
+  for (let r=0;r<8;r++) s += `<text x="26" y="${y0+r*step+4}" text-anchor="middle" style="font:11px var(--mono);fill:var(--muted)">${'ABCDEFGH'[r]}</text>`;
+  s += `<line x1="40" x2="590" y1="${y0+3.5*step}" y2="${y0+3.5*step}" style="stroke:var(--muted);stroke-dasharray:4 4"/>`;
+  s += `<text x="606" y="${y0+1.5*step+4}" style="font:600 10px var(--body);fill:var(--ink-2)" transform="rotate(90 606 ${y0+1.5*step})" text-anchor="middle">TOP</text>`;
+  s += `<text x="606" y="${y0+5.5*step+4}" style="font:600 10px var(--body);fill:var(--ink-2)" transform="rotate(90 606 ${y0+5.5*step})" text-anchor="middle">BOTTOM</text>`;
+  for (let r=0;r<8;r++) for (let c=0;c<12;c++){
+    const w = wellInfo(r,c), cx = x0+c*step, cy = y0+r*step;
+    let v = w.kind === 'chem' ? data[w.half].lum[w.k].reps[w.rep] : w.kind === 'ref' ? 1 : w.kind === 'ref80' ? .8 : w.kind === 'ctl' ? .06 : 0;
+    v = Math.max(0, Math.min(1, v));
+    s += `<g class="w" data-r="${r}" data-c="${c}" tabindex="0"><circle class="ring" cx="${cx}" cy="${cy}" r="${rad}" style="fill:var(--surface);stroke:${col[w.kind]};stroke-width:2"/>`;
+    if (v > .02) s += `<circle cx="${cx}" cy="${cy}" r="${rad-4}" style="fill:var(--glow);opacity:${(.12+.88*v).toFixed(2)}"/>`;
+    s += `</g>`;
+  }
+  svg.innerHTML = s;
+  $('#pkey').innerHTML = [['var(--f-ctl)','Controls: solvent (col 1), reference 100 % (cols 9–10)' + (pst.mode==='ANT'?', reference 80 % (col 11)':'')],['var(--f-lum)','Chemical wells: 7 doses × 4 replicates, read by the script'],['var(--line)','Not read']].map(([c,l]) => `<span><i style="--kc:${c}"></i>${l}</span>`).join('') + '<span style="font-size:.78rem;color:var(--muted)">Well brightness = example luciferase light.</span>';
+}
+function wellHover(e){ const g = e.target.closest('.w'); if (!g) return;
+  const w = wellInfo(+g.dataset.r, +g.dataset.c);
+  $('#pwell').innerHTML = `<b>${w.title}</b><span>${w.text}</span><span><code>${w.cell}</code></span>`; }
+$('#plate').addEventListener('mouseover', wellHover); $('#plate').addEventListener('focusin', wellHover);
+$('#segPlate').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pst.mode = b.dataset.v;
+  $('#segPlate').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); drawPlate(); });
+drawPlate();
 
 load();
 </script>

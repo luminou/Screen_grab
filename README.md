@@ -2,7 +2,7 @@
 
 Python scripts that turn a folder of lab run workbooks into report-ready table images, in one run.
 
-I wrote them in 2023 for a method-validation study run with **PEPPER**, the French public–private platform that pre-validates test methods for endocrine disruptors. Each experiment produced one Excel workbook per run, and the study report needed the same key values from every run, laid out the same way. Instead of copying cells and taking screenshots by hand, the script opens every workbook in a folder, reads the right cells and exports one PNG per chemical.
+I wrote them in 2023 for a validation study of two reporter-gene assays used to detect endocrine disruptors. Each experiment produced one Excel workbook per run, and the study report needed the same key values from every run, laid out the same way. Instead of copying cells and taking screenshots by hand, the script opens every workbook in a folder, reads the right cells and exports one PNG per chemical.
 
 **Live case study with an interactive walkthrough:** https://luminou.github.io/Screen_grab/
 **All data projects:** https://luminou.github.io/Data_Projects/
@@ -10,6 +10,17 @@ I wrote them in 2023 for a method-validation study run with **PEPPER**, the Fren
 > The study workbooks are not public. The web page uses invented example values and a sheet layout rebuilt from the cell addresses in the scripts.
 
 ---
+
+## The assays
+
+- **GRTA**: glucocorticoid receptor transactivation. The receptor for cortisol (stress, inflammation, metabolism).
+- **RARTA**: retinoic acid receptor transactivation. The receptor for retinoic acid, made from vitamin A (development, differentiation).
+- **AGO**: the chemical alone; light in % of the reference agonist's maximum.
+- **ANT**: the chemical with the reference agonist at ~80 % (Ref80); a drop means the receptor is blocked.
+- **INT**: the chemical with the reference at 100 %; separates true competition from interference with the cells or the light reaction.
+- **Viability**: read for every dose, so a drop in light only counts if the cells are alive.
+
+Each plate holds two chemicals (top rows A–D, bottom rows E–H), each at 7 concentrations in 4 replicate wells.
 
 ## What the script does
 
@@ -26,7 +37,7 @@ For every `*.xlsx` (GRTA) or `*.xlsm` (RARTA) file in the input folder:
 | Field | Cell | pandas call |
 |---|---|---|
 | Date | E4 | `df.iat[2, 4]` |
-| Co-exposure concentration (ANT, INT) | E11 | `df.iat[9, 4]` |
+| Co-exposure concentration of the reference agonist (ANT, INT) | E11 | `df.iat[9, 4]` |
 | Top chemical / mode / run | E15 / G15 / H15 | `df.iat[13, 4]`, `df.iat[13, 6]`, `df.iat[13, 7]` |
 | Bottom chemical / run | E16 / H16 | `df.iat[14, 4]`, `df.iat[14, 7]` |
 | Basal (% mean, % sd) | E19:F19 | `df.iat[17, 4]`, `df.iat[17, 5]` |
