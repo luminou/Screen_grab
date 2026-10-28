@@ -189,7 +189,7 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
       <p class="eyebrow">Data automation · case study</p>
       <h1>Screen Grab<span>Turning a folder of lab workbooks into report-ready tables, in one run</span></h1>
       <p class="lede">In 2023 I worked on a validation study of two reporter-gene assays used to detect endocrine disruptors. Every experiment produced one Excel workbook per run, and the study report needed the same key numbers from each one, laid out the same way. Instead of copying cells and taking screenshots by hand, I wrote a Python script that opens every workbook in a folder, reads the right cells and exports one clean PNG table per chemical.</p>
-      <div class="tags"><span class="tag">Python 3</span><span class="tag">pandas</span><span class="tag">pathlib</span><span class="tag">Bokeh DataTable</span><span class="tag">export_png</span><span class="tag">batch processing</span><span class="tag">2023</span></div>
+      <div class="tags"><span class="tag">Python 3</span><span class="tag">pandas</span><span class="tag">pathlib</span><span class="tag">matplotlib</span><span class="tag">openpyxl</span><span class="tag">batch processing</span><span class="tag">2023</span></div>
     </div>
     <div class="flow" id="flow"></div>
   </div>
@@ -199,7 +199,7 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
   <div class="wrap">
     <p class="eyebrow" id="h-num">The tool in numbers</p>
     <div class="stats">
-      <div class="stat"><b>6</b><small>script variants: 2 assays × 3 modes</small></div>
+      <div class="stat"><b>1</b><small>script for 2 assays × 3 modes</small></div>
       <div class="stat"><b>2</b><small>chemicals per workbook (top and bottom of the plate)</small></div>
       <div class="stat"><b>13</b><small>single cells read for the run identity and controls</small></div>
       <div class="stat"><b>7 × 4</b><small>concentrations × replicate wells, per chemical and per sheet</small></div>
@@ -282,32 +282,34 @@ footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--mute
     <p class="eyebrow">Inside the script</p>
     <h2 id="h-code">Four ideas do all the work</h2>
     <div class="codegrid">
-      <div class="snip"><h3>Loop over a whole folder</h3><p><code>pathlib</code> finds every workbook, so a new batch of runs only needs to be dropped in the folder.</p>
-<pre>mydir = Path('.../GRTA/PHASE_2/ago')
-<span class="h">for file in mydir.glob('*.xlsx'):</span>
-    df = pd.read_excel(file, sheet_name='Luminescence')</pre></div>
-      <div class="snip"><h3>Read single cells by position</h3><p>The run template never changes, so each field sits at a fixed address. <code>iat[row, col]</code> picks it directly.</p>
-<pre>date         = df.iat[2, 4]    <span class="c"># cell E4</span>
-molecule_top = df.iat[13, 4]   <span class="c"># cell E15</span>
-mode         = df.iat[13, 6]   <span class="c"># cell G15</span>
-IFmean       = df.iat[18, 4]   <span class="c"># cell E20</span></pre></div>
-      <div class="snip"><h3>Cut out a data block</h3><p>Skip to the right row, keep 7 rows, and select only the normalised columns. The raw luminescence columns stay behind.</p>
-<pre>pd.read_excel(file, sheet_name='Viability',
-    <span class="h">skiprows=29, nrows=7,
-    usecols='D,L:O, P, Q, S'</span>)
-<span class="c"># → Conc(M), norm1..4, mean%, sd%, CV%</span></pre></div>
-      <div class="snip"><h3>Render, name and skip</h3><p>Tables are laid out in a grid and saved under a name built from the run's own metadata. Empty bottom halves are skipped.</p>
-<pre>names = [molecule, mode, run, date]
-export_png(grid, filename='_'.join(names) + '.png')
+      <div class="snip"><h3>Loop over every folder</h3><p><code>pathlib</code> finds every workbook of every assay and mode, so a new batch of runs only needs to be dropped in the right folder.</p>
+<pre>for assay, ext in [('GRTA', 'xlsx'), ('RARTA', 'xlsm')]:
+    for mode, cfg in LAYOUT.items():
+        <span class="h">for wb in (ROOT / assay / mode).glob(f'*.{ext}'):</span>
+            export_card(read_run(wb, cfg))</pre></div>
+      <div class="snip"><h3>Read cells by their Excel address</h3><p>The run template never changes, so each field sits at a fixed address. A small helper turns <code>'E15'</code> into a row and a column.</p>
+<pre>COMMON = {'Date': 'E4', 'Mode': 'G15',
+          'Basal': 'E19:F19', 'IF': 'E20:F20'}
+HALVES = {'top':    dict(molecule='E15', run='H15', first_row=31),
+          'bottom': dict(molecule='E16', run='H16', first_row=43)}
+<span class="h">molecule = cell(lum, 'E15')</span></pre></div>
+      <div class="snip"><h3>Cut out a data block</h3><p>For each chemical, 7 rows starting at row 31 or 43, keeping only the normalised columns. The raw luminescence columns stay behind.</p>
+<pre>BLOCK_COLS = ['D', 'L', 'M', 'N', 'O', 'P', 'Q', 'S']
+<span class="c"># → Conc (M), norm1..4, mean %, sd %, CV %</span>
+<span class="h">block(lum, first_row)</span>   <span class="c"># Luminescence</span>
+<span class="h">block(via, first_row)</span>   <span class="c"># Viability</span></pre></div>
+      <div class="snip"><h3>Render, name and skip</h3><p>Three matplotlib tables per chemical, saved under a name built from the run’s own metadata. An empty half of the plate is skipped.</p>
+<pre><span class="h">if molecule.lower() == 'no compound': continue</span>
 
-<span class="h">if molecule_bot == "no compound": continue</span></pre></div>
+name = '_'.join([molecule, mode, run, date]) + '.png'
+fig.savefig(out_dir / name)</pre></div>
     </div>
   </div>
 </section>
 
 <section aria-labelledby="h-var">
   <div class="wrap">
-    <p class="eyebrow">Six variants, one template</p>
+    <p class="eyebrow">Six configurations, one table</p>
     <h2 id="h-var">What changes between assays and modes</h2>
     <div class="tablewrap"><table class="var">
       <thead><tr><th>Mode</th><th>Question asked</th><th>Extra fields read</th><th>Columns in the identity table</th></tr></thead>
@@ -317,22 +319,9 @@ export_png(grid, filename='_'.join(names) + '.png')
         <tr><td>INT · interference</td><td>Is a drop real competition, or is the chemical disturbing the cells or the light reaction?</td><td><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Conc coexpo (M)</span></td></tr>
       </tbody>
     </table></div>
-    <p class="lede read" style="font-size:.92rem">The <b>GRTA</b> scripts (glucocorticoid receptor transactivation, phase 2) read <code>.xlsx</code> files; the <b>RARTA</b> scripts (retinoic acid receptor transactivation, phase 1) read macro-enabled <code>.xlsm</code> workbooks. Everything else is shared.</p>
-  </div>
-</section>
-
-<section aria-labelledby="h-retro">
-  <div class="wrap">
-    <p class="eyebrow">Looking back</p>
-    <h2 id="h-retro">What I would change today</h2>
     <div class="retro">
-      <div class="snip"><h3>My notes at the time</h3><ul>
-        <li>Bokeh is built for interactive pages, so exporting static PNGs through a headless browser was slow.</li>
-        <li>Some pandas calls (<code>set_axis(..., inplace=True)</code>) were already deprecated.</li>
-        <li>Ref80 for antagonist runs and Ref100 for interference runs were still to be added.</li>
-      </ul></div>
-      <div class="snip"><h3>A single configurable script</h3><p>The six copies differ only in a folder, a file extension and a few cell addresses. Today I would keep those in one table and write the extraction once.</p>
-<pre>LAYOUT = {
+      <p class="lede read" style="font-size:.95rem">The six assay–mode combinations differ only in a folder, a file extension and a few cell addresses. They are kept in one table, with the extraction written once. <b>GRTA</b> workbooks are <code>.xlsx</code> files; <b>RARTA</b> workbooks are macro-enabled <code>.xlsm</code> files.</p>
+      <div class="snip"><pre>LAYOUT = {
   'AGO': dict(extra={}),
   'ANT': dict(extra={'Ref80': 'E21:F21', 'Coexpo': 'E11'}),
   'INT': dict(extra={'Coexpo': 'E11'}),
@@ -353,7 +342,7 @@ for assay, ext in [('GRTA', 'xlsx'), ('RARTA', 'xlsm')]:
       <div class="skill"><h3>Automating the boring part</h3><p>Spotting a repetitive manual task in a team workflow and replacing it with a script colleagues could rerun.</p></div>
       <div class="skill"><h3>Reading messy sources</h3><p>Pulling structured data out of human-formatted spreadsheets with fixed layouts, mixed types and empty slots.</p></div>
       <div class="skill"><h3>Consistent outputs</h3><p>Same table, same formats (%, scientific notation) and a predictable file name for every run, ready for the report.</p></div>
-      <div class="skill"><h3>Honest about limits</h3><p>Writing down performance problems and missing fields in the code itself, so the next person knows where to start.</p></div>
+      <div class="skill"><h3>Configuration over copies</h3><p>One table describes what changes between assays and modes, so adding a mode means adding one line, not a new script.</p></div>
     </div>
   </div>
 </section>
@@ -383,7 +372,7 @@ $('#flow').innerHTML = `<svg viewBox="0 0 520 300" role="img" aria-label="A fold
   <text x="260" y="138" text-anchor="middle" style="font:700 15px var(--display);fill:var(--bg)">main loop</text>
   <text x="260" y="158" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">read cells</text>
   <text x="260" y="172" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">build tables</text>
-  <text x="260" y="186" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">export_png</text>
+  <text x="260" y="186" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">export_card</text>
   <path d="M324 150 H372" style="stroke:var(--ink-2);stroke-width:1.5" marker-end="url(#ar)"/>
   ${[0,1,2].map(i => `<g transform="translate(${380} ${40+i*74})"><rect width="124" height="62" rx="4" style="fill:var(--surface);stroke:var(--line)"/><rect x="8" y="8" width="108" height="7" rx="1" style="fill:var(--f-id);opacity:.5"/><rect x="8" y="22" width="50" height="32" rx="1" style="fill:var(--f-lum);opacity:.35"/><rect x="66" y="22" width="50" height="32" rx="1" style="fill:var(--f-via);opacity:.35"/></g>`).join('')}
   <text x="442" y="278" text-anchor="middle" style="font:600 12px var(--body);fill:var(--ink)">one PNG per chemical</text>
@@ -420,7 +409,7 @@ function makeBlock(r, mode, k){
 }
 function row(c, reps){ const m = reps.reduce((a,b)=>a+b,0)/4; const sd = Math.sqrt(reps.reduce((a,b)=>a+(b-m)**2,0)/3); return { c, reps, raw: reps.map(v => Math.round(v * 52000 + 900)), mean: m, sd, cv: sd/m }; }
 
-/* ---------- formatting like the Bokeh formatters ---------- */
+/* ---------- number formats used in the exported tables ---------- */
 const P = v => (v * 100).toFixed(1) + '%';           // NumberFormatter('0.0%')
 const N = v => v.toFixed(1);                          // NumberFormatter('0.0')
 const S = v => { const e = Math.floor(Math.log10(v)); const m = v / 10**e; return (+m.toFixed(4)) + 'e' + (e < 0 ? '-' : '+') + String(Math.abs(e)).padStart(2,'0'); }; // ScientificFormatter
@@ -482,7 +471,7 @@ function renderSheet(f){
   $('#sheet').innerHTML = h + '</tbody>';
 }
 
-/* ---------- report card (mirrors the Bokeh grid) ---------- */
+/* ---------- report card (mirrors the exported image) ---------- */
 function td(v, fld, a){ return `<td data-f="${fld}" data-a="${a}" style="--fc:var(${FIELDS[fld].color})">${esc(v)}</td>`; }
 function renderCard(f){
   const h = st.half, skip = h === 'bot' && f.bot === 'no compound';
