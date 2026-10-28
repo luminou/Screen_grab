@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Case study of a Python script that batch-extracts lab run workbooks into report-ready tables.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Screen Grab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a spreadsheet under an X-ray — the story column frames a live "workbook → report card" machine in the middle of the page. */
+:root{
+  --bg:#f4f7f6; --surface:#ffffff; --sunk:#eaf0ee; --ink:#10201d; --ink-2:#475754; --muted:#6f7e7a; --line:#d6dfdc;
+  --accent:#0d7461; --accent-soft:#d9efe9; --glow:#d4f25a;
+  --grid:#e3e9e7; --gridhead:#f0f3f2; --xl:#1d6f42;
+  --f-id:#2a78d6; --f-ctl:#eb6834; --f-co:#6250d6; --f-lum:#1baf7a; --f-via:#eda100;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1211; --surface:#111b19; --sunk:#0e1715; --ink:#e7efed; --ink-2:#a8b7b3; --muted:#7c8b87; --line:#24322f;
+  --accent:#4fd0b3; --accent-soft:#163a33; --glow:#c6f03c;
+  --grid:#22302d; --gridhead:#162320; --xl:#3fae72;
+  --f-id:#3987e5; --f-ctl:#d95926; --f-co:#9085e9; --f-lum:#199e70; --f-via:#c98500; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1211; --surface:#111b19; --sunk:#0e1715; --ink:#e7efed; --ink-2:#a8b7b3; --muted:#7c8b87; --line:#24322f;
+  --accent:#4fd0b3; --accent-soft:#163a33; --glow:#c6f03c;
+  --grid:#22302d; --gridhead:#162320; --xl:#3fae72;
+  --f-id:#3987e5; --f-ctl:#d95926; --f-co:#9085e9; --f-lum:#199e70; --f-via:#c98500; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.read{max-width:68ch}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h2{font-size:clamp(1.5rem,1.1rem + 1.4vw,2.1rem);font-weight:700;line-height:1.15}
+h3{font-size:1.02rem;font-weight:700}
+p{margin:0}
+.eyebrow{font:500 .72rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+section{padding-block:56px;border-top:1px solid var(--line)}
+section > .wrap{display:grid;gap:22px}
+.lede{color:var(--ink-2);font-size:1.02rem}
+code{font-family:var(--mono);font-size:.86em;background:var(--sunk);padding:1px 5px;border-radius:4px}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.hero{padding-block:56px 44px}
+header.hero .wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:40px;align-items:center}
+.hero h1{font-size:clamp(2.4rem,1.5rem + 3.6vw,4.2rem);font-weight:800;line-height:.95;letter-spacing:-.03em}
+.hero h1 span{display:block;font-weight:500;font-size:.4em;letter-spacing:0;color:var(--ink-2);margin-top:14px;line-height:1.2}
+.hero .lede{margin-top:18px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.tag{font:500 .74rem/1 var(--mono);padding:6px 9px;border:1px solid var(--line);border-radius:999px;color:var(--ink-2);background:var(--surface)}
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;overflow-x:auto}
+.flow svg{display:block;width:100%;min-width:440px;height:auto}
+
+.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stat{background:var(--surface);padding:16px 14px}
+.stat b{display:block;font:700 1.7rem/1.05 var(--display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat small{display:block;color:var(--muted);font-size:.78rem;line-height:1.35;margin-top:6px}
+
+/* the machine */
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{font:500 .8rem var(--mono);border:0;background:transparent;color:var(--ink-2);padding:8px 12px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.ctl{display:flex;align-items:center;gap:8px;font:600 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.machine{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;align-items:start}
+.folder{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:10px}
+.folder .path{font:.7rem/1.4 var(--mono);color:var(--muted);word-break:break-all}
+.files{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.file{display:flex;align-items:center;gap:8px;font:.78rem var(--mono);padding:7px 8px;border-radius:7px;cursor:pointer;border:1px solid transparent;color:var(--ink)}
+.file:hover{background:var(--sunk)}
+.file[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.file .ico{width:16px;height:18px;border-radius:2px;background:var(--xl);color:#fff;font:700 9px/18px var(--body);text-align:center;flex:none}
+.file .st{margin-left:auto;font-size:.68rem;color:var(--muted)}
+.file.done .st{color:var(--accent)}
+.btn{font:600 .84rem var(--body);border:1px solid var(--ink);background:var(--ink);color:var(--bg);padding:9px 12px;border-radius:9px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.outputs{display:grid;gap:4px;max-height:220px;overflow:auto}
+.png{font:.72rem/1.35 var(--mono);color:var(--ink-2);padding:5px 7px;border-radius:6px;background:var(--sunk);word-break:break-all;cursor:pointer;border:0;text-align:left}
+.png.skip{background:transparent;color:var(--muted);font-style:italic;cursor:default}
+.empty-note{font-size:.78rem;color:var(--muted)}
+
+.xray{display:grid;grid-template-rows:auto auto;gap:16px;min-width:0}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0;overflow:hidden}
+.panehead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.panehead h3{font-size:.92rem}
+.panehead .sub{font:.72rem var(--mono);color:var(--muted)}
+.sheetwrap{overflow:auto;max-height:430px}
+table.sheet{border-collapse:collapse;font:11px/1 var(--mono);font-variant-numeric:tabular-nums}
+.sheet th,.sheet td{border:1px solid var(--grid);height:21px;padding:0 5px;white-space:nowrap;min-width:46px;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.sheet th{background:var(--gridhead);color:var(--muted);font-weight:500;position:sticky;top:0;z-index:2;text-align:center}
+.sheet td.rh{background:var(--gridhead);color:var(--muted);text-align:center;position:sticky;left:0;z-index:1;min-width:30px}
+.sheet td{color:var(--ink-2)}
+.sheet td.lbl{color:var(--muted);font-family:var(--body)}
+.sheet td.raw{color:var(--muted);opacity:.6}
+.sheet tr.gap td{height:14px;color:var(--muted);text-align:center;border-color:transparent;background:transparent}
+.sheet td[data-f]{color:var(--ink);font-weight:500;background:color-mix(in srgb, var(--fc) 16%, transparent);border-color:color-mix(in srgb, var(--fc) 45%, var(--grid))}
+.sheet td[data-f].hl, .card td[data-f].hl, .card th[data-f].hl{outline:2px solid var(--fc);outline-offset:-2px;background:color-mix(in srgb, var(--fc) 32%, transparent)}
+.tabs{display:flex;gap:2px;padding:6px 8px 0;background:var(--gridhead);border-top:1px solid var(--line)}
+.tabs button{font:500 .74rem var(--body);border:1px solid var(--line);border-bottom:0;background:var(--sunk);color:var(--muted);padding:5px 12px;border-radius:6px 6px 0 0;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--xl);font-weight:600}
+
+.cardwrap{padding:14px;overflow-x:auto;background:var(--sunk)}
+.card{background:#fff;color:#1d1d1d;border-radius:4px;padding:10px;display:grid;gap:8px;width:max-content;min-width:100%;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.card table{border-collapse:collapse;font:11px/1.3 "Helvetica Neue",Arial,sans-serif;width:100%;font-variant-numeric:tabular-nums}
+.card th{font-weight:600;text-align:left;padding:4px 6px;border-bottom:1px solid #c9c9c9;background:#f6f6f6;color:#333;white-space:nowrap}
+.card td{padding:3px 6px;border-bottom:1px solid #ececec;white-space:nowrap}
+.card .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card b.t{font:700 12px Arial,sans-serif}
+.card td{color:#1d1d1d}
+.card td[data-f]{background:color-mix(in srgb, var(--fc) 9%, #fff)}
+.fname{font:.78rem var(--mono);color:var(--ink);word-break:break-all}
+.fname span{color:var(--muted)}
+.key{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.8rem;color:var(--ink-2)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.key i{width:12px;height:12px;border-radius:3px;background:color-mix(in srgb, var(--fc) 30%, transparent);border:1px solid var(--fc)}
+.example{font:.72rem var(--mono);color:var(--muted)}
+
+/* code */
+.codegrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.snip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:8px;min-width:0;align-content:start}
+.snip p{font-size:.88rem;color:var(--ink-2)}
+.snip pre{margin:0;background:var(--sunk);border-radius:8px;padding:10px 12px;font:.74rem/1.55 var(--mono);overflow-x:auto;white-space:pre}
+.snip pre .c{color:var(--muted)}
+.snip pre .h{background:color-mix(in srgb, var(--glow) 45%, transparent);border-radius:3px;color:var(--ink)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.var{border-collapse:collapse;width:100%;min-width:640px;font-size:.86rem}
+.var th,.var td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.var th{font:600 .7rem var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--sunk)}
+.var td:first-child{font-weight:600;white-space:nowrap}
+.var tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font:500 .72rem var(--mono);padding:2px 7px;border-radius:5px;background:var(--sunk);color:var(--ink-2);margin:1px 2px 1px 0}
+.pill.on{background:var(--accent-soft);color:var(--accent)}
+
+.retro{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.retro .snip ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:.9rem;display:grid;gap:6px}
+.skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.skill{border-top:3px solid var(--glow);padding-top:12px}
+.skill h3{font-size:.98rem;margin-bottom:6px}
+.skill p{font-size:.86rem;color:var(--ink-2)}
+footer{padding-block:32px 48px;border-top:1px solid var(--line);color:var(--muted);font-size:.8rem}
+
+@media (max-width:980px){
+  header.hero .wrap,.retro,.codegrid{grid-template-columns:1fr}
+  .machine{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .skills{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:560px){ .stats{grid-template-columns:repeat(2,minmax(0,1fr))} .skills{grid-template-columns:1fr} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.backnav{padding-block:18px 0;font:500 .78rem var(--mono)}.backnav a{color:var(--muted);text-decoration:none}.backnav a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<nav class="wrap backnav" aria-label="Back"><a href="https://luminou.github.io/Data_Projects/">← All data projects</a></nav>
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Data automation · case study</p>
+      <h1>Screen Grab<span>Turning a folder of lab workbooks into report-ready tables, in one run</span></h1>
+      <p class="lede">In 2023 I worked on a method-validation study for <b>PEPPER</b>, the French public–private platform that pre-validates test methods for endocrine disruptors. Every experiment produced one Excel workbook per run, and the study report needed the same key numbers from each one, laid out the same way. Instead of copying cells and taking screenshots by hand, I wrote a Python script that opens every workbook in a folder, reads the right cells and exports one clean PNG table per chemical.</p>
+      <div class="tags"><span class="tag">Python 3</span><span class="tag">pandas</span><span class="tag">pathlib</span><span class="tag">Bokeh DataTable</span><span class="tag">export_png</span><span class="tag">batch processing</span><span class="tag">2023</span></div>
+    </div>
+    <div class="flow" id="flow"></div>
+  </div>
+</header>
+
+<section aria-labelledby="h-num">
+  <div class="wrap">
+    <p class="eyebrow" id="h-num">The tool in numbers</p>
+    <div class="stats">
+      <div class="stat"><b>6</b><small>script variants: 2 assays × 3 modes</small></div>
+      <div class="stat"><b>2</b><small>chemicals per workbook (top and bottom of the plate)</small></div>
+      <div class="stat"><b>13</b><small>single cells read for the run identity and controls</small></div>
+      <div class="stat"><b>7 × 4</b><small>concentrations × replicate wells, per chemical and per sheet</small></div>
+      <div class="stat"><b>3</b><small>tables combined in each exported image</small></div>
+      <div class="stat"><b>1</b><small>command to process a whole folder</small></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-xray">
+  <div class="wrap">
+    <p class="eyebrow">Interactive · how one workbook becomes one image</p>
+    <h2 id="h-xray">See exactly which cells the script reads</h2>
+    <p class="lede read">Pick an assay and a mode, then a workbook from the folder. Coloured cells in the spreadsheet are the ones the script extracts; the report card underneath is what it exports. Hover any coloured value, in either view, to see where it comes from. Press <b>Run script</b> to process the whole folder.</p>
+    <div class="controls">
+      <div class="ctl">Assay <span class="seg" id="segAssay"><button type="button" data-v="GRTA" aria-pressed="true">GRTA</button><button type="button" data-v="RARTA" aria-pressed="false">RARTA</button></span></div>
+      <div class="ctl">Mode <span class="seg" id="segMode"><button type="button" data-v="AGO" aria-pressed="true">AGO</button><button type="button" data-v="ANT" aria-pressed="false">ANT</button><button type="button" data-v="INT" aria-pressed="false">INT</button></span></div>
+      <div class="ctl">Chemical <span class="seg" id="segHalf"><button type="button" data-v="top" aria-pressed="true">Top</button><button type="button" data-v="bot" aria-pressed="false">Bottom</button></span></div>
+    </div>
+    <div class="key" id="key"></div>
+    <div class="machine">
+      <aside class="folder" aria-label="Input folder and outputs">
+        <div><h3 style="font-size:.9rem">Input folder</h3><div class="path" id="path"></div></div>
+        <ul class="files" id="files"></ul>
+        <button type="button" class="btn" id="run">Run script</button>
+        <div><h3 style="font-size:.9rem;margin-bottom:6px">Exported images</h3><div class="outputs" id="outputs"><p class="empty-note">Nothing exported yet.</p></div></div>
+      </aside>
+      <div class="xray">
+        <div class="pane">
+          <div class="panehead"><h3 id="wbName">Workbook</h3><span class="example">Example values · layout rebuilt from the script's cell addresses</span></div>
+          <div class="sheetwrap"><table class="sheet" id="sheet"></table></div>
+          <div class="tabs" role="tablist"><button type="button" role="tab" data-s="Luminescence" aria-selected="true">Luminescence</button><button type="button" role="tab" data-s="Viability" aria-selected="false">Viability</button></div>
+        </div>
+        <div class="pane">
+          <div class="panehead"><h3>Exported report card</h3><div class="fname" id="fname"></div></div>
+          <div class="cardwrap"><div class="card" id="card"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-code">
+  <div class="wrap">
+    <p class="eyebrow">Inside the script</p>
+    <h2 id="h-code">Four ideas do all the work</h2>
+    <div class="codegrid">
+      <div class="snip"><h3>Loop over a whole folder</h3><p><code>pathlib</code> finds every workbook, so a new batch of runs only needs to be dropped in the folder.</p>
+<pre>mydir = Path('.../GRTA/Data_Inserm/PHASE_2/ago')
+<span class="h">for file in mydir.glob('*.xlsx'):</span>
+    df = pd.read_excel(file, sheet_name='Luminescence')</pre></div>
+      <div class="snip"><h3>Read single cells by position</h3><p>The run template never changes, so each field sits at a fixed address. <code>iat[row, col]</code> picks it directly.</p>
+<pre>date         = df.iat[2, 4]    <span class="c"># cell E4</span>
+molecule_top = df.iat[13, 4]   <span class="c"># cell E15</span>
+mode         = df.iat[13, 6]   <span class="c"># cell G15</span>
+IFmean       = df.iat[18, 4]   <span class="c"># cell E20</span></pre></div>
+      <div class="snip"><h3>Cut out a data block</h3><p>Skip to the right row, keep 7 rows, and select only the normalised columns. The raw luminescence columns stay behind.</p>
+<pre>pd.read_excel(file, sheet_name='Viability',
+    <span class="h">skiprows=29, nrows=7,
+    usecols='D,L:O, P, Q, S'</span>)
+<span class="c"># → Conc(M), norm1..4, mean%, sd%, CV%</span></pre></div>
+      <div class="snip"><h3>Render, name and skip</h3><p>Tables are laid out in a grid and saved under a name built from the run's own metadata. Empty bottom halves are skipped.</p>
+<pre>names = [molecule, mode, run, date]
+export_png(grid, filename='_'.join(names) + '.png')
+
+<span class="h">if molecule_bot == "no compound": continue</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-var">
+  <div class="wrap">
+    <p class="eyebrow">Six variants, one template</p>
+    <h2 id="h-var">What changes between assays and modes</h2>
+    <div class="tablewrap"><table class="var">
+      <thead><tr><th>Mode</th><th>Question asked</th><th>Extra fields read</th><th>Columns in the identity table</th></tr></thead>
+      <tbody>
+        <tr><td>AGO · agonist</td><td>Does the chemical activate the receptor on its own?</td><td>none</td><td><span class="pill">Date</span><span class="pill">Molecule</span><span class="pill">Mode</span><span class="pill">Run</span><span class="pill">Basal</span><span class="pill">Induction factor</span></td></tr>
+        <tr><td>ANT · antagonist</td><td>Does it block the receptor activated by a reference agonist?</td><td><span class="pill on">Ref80 mean / sd (E21:F21)</span><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Ref80 (%mean)</span><span class="pill on">Ref80 (%sd)</span><span class="pill on">Conc coexpo (M)</span></td></tr>
+        <tr><td>INT · interference</td><td>Does it disturb the reporter signal itself?</td><td><span class="pill on">co-exposure conc. (E11)</span></td><td>… <span class="pill on">Conc coexpo (M)</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="lede read" style="font-size:.92rem">The <b>GRTA</b> scripts (glucocorticoid receptor transactivation, phase 2) read <code>.xlsx</code> files; the <b>RARTA</b> scripts (retinoic acid receptor transactivation, phase 1) read macro-enabled <code>.xlsm</code> workbooks. Everything else is shared.</p>
+  </div>
+</section>
+
+<section aria-labelledby="h-retro">
+  <div class="wrap">
+    <p class="eyebrow">Looking back</p>
+    <h2 id="h-retro">What I would change today</h2>
+    <div class="retro">
+      <div class="snip"><h3>My notes at the time</h3><ul>
+        <li>Bokeh is built for interactive pages, so exporting static PNGs through a headless browser was slow.</li>
+        <li>Some pandas calls (<code>set_axis(..., inplace=True)</code>) were already deprecated.</li>
+        <li>Ref80 for antagonist runs and Ref100 for interference runs were still to be added.</li>
+      </ul></div>
+      <div class="snip"><h3>A single configurable script</h3><p>The six copies differ only in a folder, a file extension and a few cell addresses. Today I would keep those in one table and write the extraction once.</p>
+<pre>LAYOUT = {
+  'AGO': dict(extra={}),
+  'ANT': dict(extra={'Ref80': 'E21:F21', 'Coexpo': 'E11'}),
+  'INT': dict(extra={'Coexpo': 'E11'}),
+}
+for assay, ext in [('GRTA', 'xlsx'), ('RARTA', 'xlsm')]:
+    for mode, cfg in LAYOUT.items():
+        for wb in (ROOT / assay / mode).glob(f'*.{ext}'):
+            export_card(read_run(wb, cfg))  <span class="c"># matplotlib table</span></pre></div>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-sk">
+  <div class="wrap">
+    <p class="eyebrow">What this project shows</p>
+    <h2 id="h-sk">Skills behind the tool</h2>
+    <div class="skills">
+      <div class="skill"><h3>Automating the boring part</h3><p>Spotting a repetitive manual task in a team workflow and replacing it with a script colleagues could rerun.</p></div>
+      <div class="skill"><h3>Reading messy sources</h3><p>Pulling structured data out of human-formatted spreadsheets with fixed layouts, mixed types and empty slots.</p></div>
+      <div class="skill"><h3>Consistent outputs</h3><p>Same table, same formats (%, scientific notation) and a predictable file name for every run, ready for the report.</p></div>
+      <div class="skill"><h3>Honest about limits</h3><p>Writing down performance problems and missing fields in the code itself, so the next person knows where to start.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer><div class="wrap">Clémentine Garoche · Source: <a href="https://github.com/luminou/Screen_grab" target="_blank" rel="noopener">GitHub repository</a> · The study workbooks are not public: every number shown on this page is an invented example, and the sheet layout is reconstructed from the cell addresses in the scripts.</div></footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const FIELDS = {
+  id:  {label:'Run identity (date, chemical, mode, run)', color:'--f-id'},
+  ctl: {label:'Plate controls (basal, induction factor, Ref80)', color:'--f-ctl'},
+  co:  {label:'Co-exposure concentration', color:'--f-co'},
+  lum: {label:'Luminescence block', color:'--f-lum'},
+  via: {label:'Viability block', color:'--f-via'},
+};
+$('#key').innerHTML = Object.values(FIELDS).map(f => `<span style="--fc:var(${f.color})"><i></i>${f.label}</span>`).join('');
+
+/* ---------- hero flow diagram ---------- */
+$('#flow').innerHTML = `<svg viewBox="0 0 520 300" role="img" aria-label="A folder of Excel workbooks goes through the Python script and comes out as one PNG table per chemical">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ink-2)"/></marker></defs>
+  ${[0,1,2,3].map(i => `<g transform="translate(${18+i*7} ${50+i*30})"><rect width="92" height="64" rx="6" style="fill:var(--surface);stroke:var(--line)"/><rect width="92" height="14" rx="6" style="fill:var(--xl)"/>${[0,1,2].map(r=>[0,1,2,3].map(c=>`<rect x="${8+c*20}" y="${22+r*12}" width="16" height="8" rx="1" style="fill:${r===1&&c>0?'var(--f-lum)':'var(--sunk)'};opacity:${r===1&&c>0?.55:1}"/>`).join('')).join('')}</g>`).join('')}
+  <text x="66" y="262" text-anchor="middle" style="font:600 12px var(--body);fill:var(--ink)">run workbooks</text>
+  <text x="66" y="278" text-anchor="middle" style="font:10px var(--mono);fill:var(--muted)">*.xlsx / *.xlsm</text>
+  <path d="M140 150 H196" style="stroke:var(--ink-2);stroke-width:1.5" marker-end="url(#ar)"/>
+  <rect x="202" y="104" width="116" height="92" rx="12" style="fill:var(--ink)"/>
+  <text x="260" y="138" text-anchor="middle" style="font:700 15px var(--display);fill:var(--bg)">main loop</text>
+  <text x="260" y="158" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">read cells</text>
+  <text x="260" y="172" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">build tables</text>
+  <text x="260" y="186" text-anchor="middle" style="font:10px var(--mono);fill:var(--bg);opacity:.75">export_png</text>
+  <path d="M324 150 H372" style="stroke:var(--ink-2);stroke-width:1.5" marker-end="url(#ar)"/>
+  ${[0,1,2].map(i => `<g transform="translate(${380} ${40+i*74})"><rect width="124" height="62" rx="4" style="fill:var(--surface);stroke:var(--line)"/><rect x="8" y="8" width="108" height="7" rx="1" style="fill:var(--f-id);opacity:.5"/><rect x="8" y="22" width="50" height="32" rx="1" style="fill:var(--f-lum);opacity:.35"/><rect x="66" y="22" width="50" height="32" rx="1" style="fill:var(--f-via);opacity:.35"/></g>`).join('')}
+  <text x="442" y="278" text-anchor="middle" style="font:600 12px var(--body);fill:var(--ink)">one PNG per chemical</text>
+</svg>`;
+
+/* ---------- example data (seeded, invented) ---------- */
+function rng(seed){ return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+const CHEMS = ['Chemical A','Chemical B','Chemical C','Chemical D','Chemical E','Chemical F','Chemical G'];
+function makeFolder(assay, mode){
+  const r = rng(assay.length * 97 + mode.charCodeAt(0) * 13 + mode.charCodeAt(2));
+  const n = 4, files = [];
+  for (let i = 0; i < n; i++){
+    const date = 230200 + 6 + i*7 + (assay === 'RARTA' ? 100 : 0);
+    const top = CHEMS[(i*2) % CHEMS.length], bot = i === 2 ? 'no compound' : CHEMS[(i*2+1) % CHEMS.length];
+    const ext = assay === 'GRTA' ? 'xlsx' : 'xlsm';
+    files.push({ name: `${assay}_${mode.toLowerCase()}_${date}.${ext}`, date, top, bot, mode, runTop: 'R' + (1 + (i % 3)), runBot: 'R' + (1 + ((i+1) % 3)),
+      basal: [0.04 + r()*0.05, 0.004 + r()*0.01], IF: [8 + r()*14, 0.6 + r()*1.8], ref80: [0.78 + r()*0.06, 0.03 + r()*0.04], coexp: mode === 'AGO' ? null : (assay === 'GRTA' ? 1e-8 : 3e-9),
+      blocks: { top: makeBlock(r, mode, i*2), bot: makeBlock(r, mode, i*2+1) } });
+  }
+  return files;
+}
+function makeBlock(r, mode, k){
+  const concs = [1e-11,1e-10,1e-9,1e-8,1e-7,1e-6,1e-5];
+  const ec = -9 + (k % 4) * 0.8, top = mode === 'AGO' ? 0.25 + r()*0.8 : 0.9, bottom = mode === 'AGO' ? 0.03 : 0.95;
+  const lum = [], via = [];
+  concs.forEach((c,i) => {
+    const x = Math.log10(c); const base = mode === 'AGO' ? bottom + (top-bottom)/(1+Math.pow(10,(ec-x))) : bottom - (bottom-0.2)/(1+Math.pow(10,(ec+1-x)));
+    const v = i === 6 ? 0.78 + r()*0.15 : 0.95 + r()*0.1;
+    const repL = [0,1,2,3].map(() => Math.max(0, base * (1 + (r()-.5)*0.16)));
+    const repV = [0,1,2,3].map(() => Math.max(0, v * (1 + (r()-.5)*0.08)));
+    lum.push(row(c, repL)); via.push(row(c, repV));
+  });
+  return { lum, via };
+}
+function row(c, reps){ const m = reps.reduce((a,b)=>a+b,0)/4; const sd = Math.sqrt(reps.reduce((a,b)=>a+(b-m)**2,0)/3); return { c, reps, raw: reps.map(v => Math.round(v * 52000 + 900)), mean: m, sd, cv: sd/m }; }
+
+/* ---------- formatting like the Bokeh formatters ---------- */
+const P = v => (v * 100).toFixed(1) + '%';           // NumberFormatter('0.0%')
+const N = v => v.toFixed(1);                          // NumberFormatter('0.0')
+const S = v => { const e = Math.floor(Math.log10(v)); const m = v / 10**e; return (+m.toFixed(4)) + 'e' + (e < 0 ? '-' : '+') + String(Math.abs(e)).padStart(2,'0'); }; // ScientificFormatter
+const SH = v => { const e = Math.floor(Math.log10(v)); const m = v / 10**e; return (m === 1 ? '1' : m.toFixed(1)) + 'E' + e; }; // Excel display
+
+/* ---------- state ---------- */
+const st = { assay: 'GRTA', mode: 'AGO', half: 'top', sheet: 'Luminescence', file: 0, folder: [], exported: [] };
+function load(){ st.folder = makeFolder(st.assay, st.mode); st.file = Math.min(st.file, st.folder.length - 1); st.exported = []; renderFolder(); renderOutputs(); render(); }
+const folderPath = () => `…/PEPPER/${st.assay === 'GRTA' ? 'GRTA/Data_Inserm/PHASE_2' : 'RAR/Manip_Inserm/PHASE_1'}/${({AGO:'ago',ANT:'antago',INT:'interf'})[st.mode]}`;
+
+function renderFolder(){
+  $('#path').textContent = folderPath();
+  $('#files').innerHTML = st.folder.map((f,i) => `<li class="file${st.exported.some(e => e.i === i) ? ' done' : ''}" data-i="${i}" tabindex="0" aria-current="${i===st.file}"><span class="ico">X</span><span>${f.name}</span><span class="st">${st.exported.some(e => e.i === i) ? 'done' : ''}</span></li>`).join('');
+}
+function renderOutputs(){
+  $('#outputs').innerHTML = st.exported.length ? st.exported.map(e => e.skip ? `<span class="png skip">${e.label}</span>` : `<button type="button" class="png" data-i="${e.i}" data-h="${e.h}">${esc(e.label)}</button>`).join('') : '<p class="empty-note">Nothing exported yet.</p>';
+}
+const fileName = (f, h) => [h === 'top' ? f.top : f.bot, f.mode, h === 'top' ? f.runTop : f.runBot, f.date].join('_') + '.png';
+
+/* ---------- spreadsheet ---------- */
+const COLS = 'ABCDEFGHIJKLMNOPQRS'.split('');
+function sheetCells(f){
+  const c = {}; const put = (addr, v, cls, fld) => c[addr] = { v, cls, fld };
+  const lum = st.sheet === 'Luminescence';
+  if (lum){
+    put('B2','PEPPER · run template','lbl'); put('D4','Date','lbl'); put('E4', f.date, '', 'id');
+    put('D11','Co-exposure (M)','lbl'); if (f.coexp) put('E11', SH(f.coexp), '', 'co'); else put('E11','—','raw');
+    put('D14','Chemical','lbl'); put('G14','Mode','lbl'); put('H14','Run','lbl');
+    put('C15','Top','lbl'); put('E15', f.top, '', st.half==='top'?'id':null); put('G15', f.mode, '', 'id'); put('H15', f.runTop, '', st.half==='top'?'id':null);
+    put('C16','Bottom','lbl'); put('E16', f.bot, '', st.half==='bot'?'id':null); put('H16', f.bot === 'no compound' ? '' : f.runBot, '', st.half==='bot' && f.bot !== 'no compound' ? 'id' : null);
+    put('E18','mean','lbl'); put('F18','sd','lbl');
+    put('D19','Basal (%)','lbl'); put('E19', P(f.basal[0]), '', 'ctl'); put('F19', P(f.basal[1]), '', 'ctl');
+    put('D20','Induction factor','lbl'); put('E20', N(f.IF[0]), '', 'ctl'); put('F20', N(f.IF[1]), '', 'ctl');
+    put('D21','Ref80 (%)','lbl'); const rf = st.mode === 'ANT'; put('E21', P(f.ref80[0]), rf ? '' : 'raw', rf ? 'ctl' : null); put('F21', P(f.ref80[1]), rf ? '' : 'raw', rf ? 'ctl' : null);
+  } else { put('B2','Viability (same plate)','lbl'); }
+  for (const [h, hdr] of [['top',30],['bot',42]]){
+    const b = f.blocks[h][lum ? 'lum' : 'via']; const active = h === st.half && !(h === 'bot' && f.bot === 'no compound'); const fld = active ? (lum ? 'lum' : 'via') : null;
+    put('B'+(hdr-1), h === 'top' ? 'Top chemical' : 'Bottom chemical', 'lbl');
+    ['Conc (M)'].forEach(t => put('D'+hdr, t, 'lbl'));
+    ['E','F','G','H'].forEach((L,i) => put(L+hdr, 'RLU '+(i+1), 'lbl')); ['L','M','N','O'].forEach((L,i) => put(L+hdr, 'norm'+(i+1), 'lbl'));
+    put('P'+hdr,'mean%','lbl'); put('Q'+hdr,'sd%','lbl'); put('S'+hdr,'CV%','lbl');
+    b.forEach((r,i) => { const R = hdr + 1 + i; const nc = f.bot === 'no compound' && h === 'bot';
+      put('D'+R, nc ? '' : SH(r.c), '', fld); ['E','F','G','H'].forEach((L,k) => put(L+R, nc ? '' : r.raw[k], 'raw'));
+      ['L','M','N','O'].forEach((L,k) => put(L+R, nc ? '' : P(r.reps[k]), '', fld)); put('P'+R, nc ? '' : P(r.mean), '', fld); put('Q'+R, nc ? '' : P(r.sd), '', fld); put('S'+R, nc ? '' : P(r.cv), '', fld); });
+  }
+  return c;
+}
+function renderSheet(f){
+  const cells = sheetCells(f);
+  const rows = [[1,21],[28,37],[40,49]];
+  let h = `<thead><tr><th></th>${COLS.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(([a,b], gi) => {
+    if (gi) h += `<tr class="gap"><td class="rh">⋮</td><td colspan="${COLS.length}"></td></tr>`;
+    for (let r = a; r <= b; r++){
+      h += `<tr><td class="rh">${r}</td>` + COLS.map(L => { const c = cells[L+r]; if (!c) return '<td></td>';
+        const f2 = c.fld ? ` data-f="${c.fld}" data-a="${L+r}" style="--fc:var(${FIELDS[c.fld].color})" title="${L+r}"` : ''; return `<td class="${c.cls||''}"${f2}>${esc(c.v)}</td>`; }).join('') + '</tr>';
+    }
+  });
+  $('#sheet').innerHTML = h + '</tbody>';
+}
+
+/* ---------- report card (mirrors the Bokeh grid) ---------- */
+function td(v, fld, a){ return `<td data-f="${fld}" data-a="${a}" style="--fc:var(${FIELDS[fld].color})">${esc(v)}</td>`; }
+function renderCard(f){
+  const h = st.half, skip = h === 'bot' && f.bot === 'no compound';
+  if (skip){ $('#card').innerHTML = `<p style="font:13px Arial,sans-serif;color:#555;padding:24px;text-align:center">Bottom half reads “no compound”: the script hits <code>continue</code> and exports nothing for it.</p>`; $('#fname').innerHTML = '<span>no file</span>'; return; }
+  const mol = h === 'top' ? f.top : f.bot, run = h === 'top' ? f.runTop : f.runBot, rowN = h === 'top' ? 15 : 16;
+  const idCols = [['Date', td(f.date,'id','E4')], ['Molecule', td(mol,'id','E'+rowN)], ['Mode', td(f.mode,'id','G15')], ['Run number', td(run,'id','H'+rowN)],
+    ['Basal (%mean)', td(P(f.basal[0]),'ctl','E19')], ['Basal (%sd)', td(P(f.basal[1]),'ctl','F19')], ['Induction factor (mean)', td(N(f.IF[0]),'ctl','E20')], ['Induction factor (sd)', td(N(f.IF[1]),'ctl','F20')]];
+  if (st.mode === 'ANT') idCols.push(['Ref80 (%mean)', td(P(f.ref80[0]),'ctl','E21')], ['Ref80 (%sd)', td(P(f.ref80[1]),'ctl','F21')]);
+  if (st.mode !== 'AGO') idCols.push(['Conc coexpo (M)', td(S(f.coexp),'co','E11')]);
+  const hdr = h === 'top' ? 30 : 42;
+  const block = (b, fld) => `<table><thead><tr>${['Conc(M)','norm1','norm2','norm3','norm4','mean%','sd%','CV%'].map(t => `<th>${t}</th>`).join('')}</tr></thead><tbody>${b.map((r,i) => { const R = hdr+1+i;
+    return `<tr>${td(S(r.c),fld,'D'+R)}${r.reps.map((v,k) => td(P(v),fld,'LMNO'[k]+R)).join('')}${td(P(r.mean),fld,'P'+R)}${td(P(r.sd),fld,'Q'+R)}${td(P(r.cv),fld,'S'+R)}</tr>`; }).join('')}</tbody></table>`;
+  $('#card').innerHTML = `<table><thead><tr>${idCols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody><tr>${idCols.map(c => c[1]).join('')}</tr></tbody></table>
+    <div class="two"><b class="t">Luminescence</b><b class="t">Viability</b></div>
+    <div class="two"><div>${block(f.blocks[h].lum,'lum')}</div><div>${block(f.blocks[h].via,'via')}</div></div>`;
+  const parts = [mol, f.mode, run, f.date];
+  $('#fname').innerHTML = parts.map(esc).join('<span>_</span>') + '<span>.png</span>';
+}
+function render(){ const f = st.folder[st.file]; $('#wbName').textContent = f.name; renderSheet(f); renderCard(f);
+  document.querySelectorAll('.file').forEach(el => el.setAttribute('aria-current', +el.dataset.i === st.file)); }
+
+/* ---------- cross-highlighting ---------- */
+function hl(addr, on){ document.querySelectorAll(`[data-a="${addr}"]`).forEach(el => el.classList.toggle('hl', on)); }
+function bindHL(root){
+  root.addEventListener('mouseover', e => { const t = e.target.closest('[data-a]'); if (t) hl(t.dataset.a, true); });
+  root.addEventListener('mouseout', e => { const t = e.target.closest('[data-a]'); if (t) hl(t.dataset.a, false); });
+}
+bindHL($('#sheet')); bindHL($('#card'));
+$('#card').addEventListener('mouseover', e => { const t = e.target.closest('[data-a]'); if (!t) return; const want = t.dataset.f === 'via' ? 'Viability' : t.dataset.f === 'lum' ? 'Luminescence' : 'Luminescence';
+  if (want !== st.sheet){ st.sheet = want; syncTabs(); renderSheet(st.folder[st.file]); hl(t.dataset.a, true); }
+  const cell = $('#sheet').querySelector(`[data-a="${t.dataset.a}"]`); const w = $('.sheetwrap');
+  if (cell){ const cr = cell.getBoundingClientRect(), wr = w.getBoundingClientRect(); if (cr.top < wr.top + 24 || cr.bottom > wr.bottom) w.scrollTop += cr.top - wr.top - wr.height/2; } });
+
+/* ---------- controls ---------- */
+function seg(id, key, after){ $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st[key] = b.dataset.v;
+  $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); after(); }); }
+seg('#segAssay','assay', load); seg('#segMode','mode', load); seg('#segHalf','half', render);
+function syncTabs(){ document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.s === st.sheet)); }
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.sheet = b.dataset.s; syncTabs(); render(); });
+$('#files').addEventListener('click', e => { const li = e.target.closest('.file'); if (!li) return; st.file = +li.dataset.i; render(); });
+$('#files').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ const li = e.target.closest('.file'); if (li){ e.preventDefault(); st.file = +li.dataset.i; render(); } } });
+$('#outputs').addEventListener('click', e => { const b = e.target.closest('button.png'); if (!b) return; st.file = +b.dataset.i; st.half = b.dataset.h;
+  $('#segHalf').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === st.half)); render(); });
+function setHalf(h){ st.half = h; $('#segHalf').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === h)); }
+
+$('#run').addEventListener('click', async () => {
+  const btn = $('#run'); btn.disabled = true; st.exported = []; renderOutputs();
+  const fast = matchMedia('(prefers-reduced-motion: reduce)').matches; const wait = ms => new Promise(r => setTimeout(r, fast ? 0 : ms));
+  for (let i = 0; i < st.folder.length; i++){
+    const f = st.folder[i]; st.file = i;
+    for (const h of ['top','bot']){
+      setHalf(h); st.sheet = 'Luminescence'; syncTabs(); render(); btn.textContent = `Reading ${f.name}…`; await wait(520);
+      if (h === 'bot' && f.bot === 'no compound') st.exported.push({ i, h, skip: true, label: `${f.name}: bottom = “no compound”, skipped` });
+      else st.exported.push({ i, h, label: fileName(f, h) });
+      renderOutputs(); renderFolder(); render(); $('#outputs').scrollTop = 1e6;
+    }
+  }
+  btn.disabled = false; btn.textContent = `Done · ${st.exported.filter(e => !e.skip).length} images · run again`;
+});
+
+load();
+</script>
+
+</body>
+</html>
